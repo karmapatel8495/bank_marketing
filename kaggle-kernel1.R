@@ -1,10 +1,10 @@
 #=============================================
 # Bank Marketing
 #=============================================
-
+setwd("C://Users//USER//Desktop//Purdue Files//R for analytics//project//bank_marketing-master")
 # Load dataset from working directory
-df <- read.csv("bank.csv", sep = ';')
-
+#df <- read.csv("bank_term_deposit.csv", sep = ';',header=T)
+df <- read.csv("https://www.dropbox.com/s/lyi5bw2fxtuahm9/bank.csv?dl=1", sep = ";")
 # Exploratory analysis
 dim(df)
 str(df)
@@ -81,6 +81,7 @@ varImpPlot(rffit) # The attribute and gini plot give the relative importance of 
 # features towards the model.
 
 # Feature Selection: Boruta
+install.packages("Boruta")
 library(Boruta)
 battrib <- Boruta(data = df, df$y~.)
 battrib # Important, tentative and rejected features shown
