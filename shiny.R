@@ -38,6 +38,8 @@ ui <- fluidPage(
   numericInput(inputId = "previous", label = "Number of contacts performed before this campaign and for this client:", value = 0)
 )
 
+
+
 server <- function(input, output){}
 
 
