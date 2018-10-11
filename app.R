@@ -1,4 +1,77 @@
+library(readr)
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(pander)
+library(knitr)
+library(h2o)
+h2o.init()
+
+jobList <- c('admin',
+             'blue-collar',
+             'entrepreneur',
+             'housemaid',
+             'management',
+             'retired',
+             'self-employed',
+             'services',
+             'student',
+             'technician',
+             'unemployed',
+             'unknown')
+
+maritalList <- c('divorced','married','single','unknown')
+
+educationList  <- c('basic.4y',
+                    'basic.6y',
+                    'basic.9y',
+                    'high.school',
+                    'illiterate',
+                    'professional.course',
+                    'university.degree',
+                    'unknown')
+
+yesnoList <- c('no',
+               'yes',
+               'unknown')
+
+contactList <- c('cellular','telephone')
+
+dayList <- c('Monday',
+             'Tuesday',
+             'Wednesday',
+             'Thursday',
+             'Friday')
+
+monthList <- c('January',
+               'February',
+               'March',
+               'April',
+               'May',
+               'June',
+               'July',
+               'August',
+               'September',
+               'October',
+               'November',
+               'December'
+)
+
+poutList <- c('Failure',
+              'Non-existent',
+              'Success')
+
+gbm <- readRDS(gzcon(url("https://www.dropbox.com/s/yuzcejfzfi9xiiy/gbm.rds?dl=1")))
+rf <- readRDS(gzcon(url("https://www.dropbox.com/s/zleo3q5ofiva4gy/rf.rds?dl=1")))
+nn <- readRDS(gzcon(url("https://www.dropbox.com/s/q16mawn0irt70on/nn.rds?dl=1")))
+
 ui <- fluidPage(
+  tags$head(
+    tags$style(HTML("hr {border-top: 2px solid #000000;}")),
+    tags$link(rel = "stylesheet", type = "text/css", 
+              href = "https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.css")
+  ),
+  
   titlePanel("Prediction of marketing efficiency"),
   sidebarLayout(
     sidebarPanel(
@@ -62,11 +135,14 @@ ui <- fluidPage(
                   choices = poutList, 
                   selected = NULL,
                   multiple = FALSE),
-      checkboxInput("showgbm", "Show/Hide GBM Prediction", value = FALSE)
+      checkboxInput("showgbm", "Show/Hide GBM Prediction", value = FALSE),
+      checkboxInput("showrf", "Show/Hide Random Forest Prediction", value = FALSE),
+      checkboxInput("shownn", "Show/Hide Neural Network Prediction", value = FALSE)
     ),
     mainPanel(
       tabsetPanel(type = "tabs",
                   tabPanel("Prediction", 
+                           hr(),
                            textOutput("age"),
                            textOutput("previous"),
                            textOutput("job"),
@@ -79,7 +155,12 @@ ui <- fluidPage(
                            textOutput("day"),
                            textOutput("month"),
                            textOutput("pout"),
-                           textOutput("predgbm")
+                           textOutput("pred"), 
+                           hr(),
+                           hr(),
+                           textOutput("predgbm"),
+                           textOutput("predrf"),
+                           textOutput("prednn")
                   ),
                   tabPanel("GBM Summary", verbatimTextOutput("gbm")),
                   tabPanel("Random Forest Summary", verbatimTextOutput("rf")),
@@ -91,7 +172,7 @@ ui <- fluidPage(
 
 server <- function(input, output, session){
 
-  predictGBM <- reactive({
+  predictMarketing <- reactive({
 
     input_data <- data.frame(matrix(ncol = 54, nrow = 0))
     
@@ -179,17 +260,56 @@ server <- function(input, output, session){
     input_data[1,] <- current_obs
     
     h2o.no_progress()
-    prediction <-  h2o.predict(gbm, newdata = as.h2o(input_data))
-    output_c <- as.data.frame(prediction)
-    output_value <- output_c$predict[1]
-    output_no_accuracy <- round(as.numeric(output_c$no[1]) * 100, 4)
-    output_yes_accuracy <- round(as.numeric(output_c$yes[1]) * 100, 4)
     
-    if (output_value == "no") {
-      return(paste("Our model predicts with ", output_no_accuracy,"% accuracy that the client WON'T subscribe to a term deposit."))
+    # GBM
+    if (input$showgbm) {
+      prediction_gbm <-  h2o.predict(gbm, newdata = as.h2o(input_data))
+      output_gbm <- as.data.frame(prediction_gbm)
+      output_value_gbm <- output_gbm$predict[1]
+      output_no_accuracy_gbm <- round(as.numeric(output_gbm$no[1]) * 100, 4)
+      output_yes_accuracy_gbm <- round(as.numeric(output_gbm$yes[1]) * 100, 4)
+      if (output_value_gbm == "no") {
+        output$predgbm <- renderPrint(cat(paste("Our GBM model predicts with ", output_no_accuracy_gbm,
+                     "% accuracy that the client WON'T subscribe to a term deposit.")))
+      }
+      else {
+        output$predgbm <- renderPrint(cat(paste("Our GBM model predicts with ", output_yes_accuracy_gbm,
+                     "% accuracy that the client WOULD subscribe to a term deposit.")))
+      }
     }
-    else {
-      return(paste("Our model predicts with ", output_yes_accuracy, "% accuracy that the client WOULD subscribe to a term deposit."))
+    
+    # RF
+    if (input$showrf) {
+      prediction_rf <- h2o.predict(rf, newdata = as.h2o(input_data))
+      output_rf <- as.data.frame(prediction_rf)
+      output_value_rf <- output_rf$predict[1]
+      output_no_accuracy_rf <- round(as.numeric(output_rf$no[1]) * 100, 4)
+      output_yes_accuracy_rf <- round(as.numeric(output_rf$yes[1]) * 100, 4)
+      if (output_value_rf == "no") {
+        output$predrf <- renderPrint(cat(paste("Our Random  Forest model predicts with ", output_no_accuracy_rf,
+                     "% accuracy that the client WON'T subscribe to a term deposit.")))
+      }
+      else {
+        output$predrf <- renderPrint(cat(paste("Our Random Forest model predicts with ", output_yes_accuracy_rf,
+                     "% accuracy that the client WOULD subscribe to a term deposit.")))
+      }
+    }
+    
+    # NN
+    if (input$shownn) {
+      prediction_nn <- h2o.predict(nn, newdata = as.h2o(input_data))
+      output_nn <- as.data.frame(prediction_nn)
+      output_value_nn <- output_nn$predict[1]
+      output_no_accuracy_nn <- round(as.numeric(output_nn$no[1]) * 100, 4)
+      output_yes_accuracy_nn <- round(as.numeric(output_nn$yes[1]) * 100, 4)
+      if (output_value_nn == "no") {
+        output$prednn <- renderPrint(cat(paste("Our Neural Network model predicts with ", output_no_accuracy_nn,
+                     "% accuracy that the client WON'T subscribe to a term deposit.")))
+      }
+      else {
+        output$prednn <- renderPrint(cat(paste("Our Neural  Network model predicts with ", output_yes_accuracy_nn,
+                     "% accuracy that the client WOULD subscribe to a term deposit.")))
+      }
     }
   })
   
@@ -232,10 +352,8 @@ server <- function(input, output, session){
   output$pout <- renderText({ 
     paste("Outcome of the previous marketing campaign? = ",input$pout)
   })
-  output$predgbm <- renderPrint(
-    if (input$showgbm) {
-      cat(predictGBM())
-      }
+  output$pred <- renderPrint(
+      predictMarketing()
     )
   output$gbm <- renderPrint({ 
     summary(gbm)
@@ -249,3 +367,5 @@ server <- function(input, output, session){
 }
 
 shinyApp(ui = ui, server = server)
+
+
